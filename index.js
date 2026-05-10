@@ -27,7 +27,14 @@ app.get('/attack', async (req, res) => {
     console.log(`[DEXTER-INJECTION] Targeting: ${target} using ${randomBrowser[0]}`);
 
     try {
-        const { state, saveCreds } = await useMultiFileAuthState('dexter_session');
+     const { state, saveCreds } = await useMultiFileAuthState('dexter_session');
+
+        const { SocksProxyAgent } = require('socks-proxy-agent');
+
+// මෙතනට ඔයාගේ Proxy එකේ විස්තර දාන්න (Free ඒවා ගොඩක් වෙලාවට වැඩ කරන්නේ නැහැ, හොද එකක් ඕනේ)
+const proxy = 'socks5://username:password@proxy-address:port';
+const agent = new SocksProxyAgent(proxy);
+
         
         const sock = makeWASocket({
     auth: state,
