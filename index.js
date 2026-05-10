@@ -7,39 +7,59 @@ const app = express();
 app.get('/api/search', async (req, res) => {
     try {
         const query = req.query.q;
-        const url = `https://cinesubz.co/?s=${encodeURIComponent(query)}`;
+        // URL එක .lk වලට මාරු කළා
+        const url = `https://cinesubz.lk/?s=${encodeURIComponent(query)}`;
         
         const response = await axios.get(url, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Referer': 'https://cinesubz.lk/',
+                'Upgrade-Insecure-Requests': '1'
             }
         });
 
         const $ = cheerio.load(response.data);
         let results = [];
 
-        // ක්‍රමය 1: Zetaflix Search Results (ඔයා එවපු කෝඩ් එකේ තිබුණ විදිහ)
-        $('.result-item').each((i, el) => {
-            const title = $(el).find('.title a').text().trim();
-            const link = $(el).find('.title a').attr('href');
-            const image = $(el).find('img').attr('src');
-            if (link && title) results.push({ title, link, image });
+        // සයිට් එකේ සැබෑ දත්ත තියෙන තැන
+        $('a').each((i, el) => {
+            const link = $(el).attr('href');
+            const title = $(el).text().trim();
+
+            // ලින්ක් එකේ /movies/ තියෙන, නමක් තියෙන ඒවා විතරක් අදිමු
+            if (link && link.includes('/movies/') && title.length > 5) {
+                // එකම දේ දෙපාරක් එන එක නවත්වන්න
+                if (!results.find(r => r.link === link)) {
+                    results.push({
+                        title: title,
+                        link: link
+                    });
+                }
+            }
         });
 
-        // ක්‍රමය 2: කිසිම රිසල්ට් එකක් නැත්නම් සයිට් එකේ තියෙන ඕනෑම ෆිල්ම් ලින්ක් එකක් අහුකරගන්න
+        // අන්තිම උත්සාහය: කිසිවක් නැත්නම් වෙනත් class එකක් බලමු
         if (results.length === 0) {
-            $('a').each((i, el) => {
-                const link = $(el).attr('href');
-                const title = $(el).text().trim();
-                // ලින්ක් එකේ 'movies' කෑල්ල තියෙන, වචන 3කට වඩා වැඩි නමක් තියෙන ලින්ක් විතරක් ගමු
-                if (link && link.includes('/movies/') && title.split(' ').length > 2) {
-                    if (!results.find(r => r.link === link)) {
-                        results.push({ title, link });
-                    }
-                }
+            $('.result-item').each((i, el) => {
+                const title = $(el).find('.title a').text().trim();
+                const link = $(el).find('.title a').attr('href');
+                if (link && title) results.push({ title, link });
             });
         }
 
+        res.json({ 
+            status: true, 
+            owner: "DEXTER", 
+            count: results.length, 
+            results 
+        });
+
+    } catch (e) {
+        res.json({ status: false, error: "Site Blocked or Error: " + e.message });
+    }
+});
         // ක්‍රමය 3: Article Tag (පරණ විදිහ)
         if (results.length === 0) {
             $('article').each((i, el) => {
