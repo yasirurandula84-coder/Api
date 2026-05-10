@@ -6,7 +6,8 @@
   "dependencies": {
     "express": "^4.18.2",
     "@whiskeysockets/baileys": "latest",
-    "pino": "^8.14.1"
+    "pino": "^8.14.1",
+    "socks-proxy-agent": "^7.0.0"
   },
   "scripts": {
     "start": "node index.js"
