@@ -30,15 +30,15 @@ app.get('/attack', async (req, res) => {
         const { state, saveCreds } = await useMultiFileAuthState('dexter_session');
         
         const sock = makeWASocket({
-            auth: state,
-            logger: pino({ level: 'silent' }),
-            browser: randomBrowser, // මෙතනදී තමයි වට්සැප් එක රවට්ටන්නේ
-            printQRInTerminal: false,
-            // සර්වර් එකේ කනෙක්ෂන් එක ඉක්මනින් Timeout වීම වැළැක්වීමට
-            connectTimeoutMs: 60000,
-            defaultQueryTimeoutMs: 0,
-            keepAliveIntervalMs: 10000
-        });
+    auth: state,
+    logger: pino({ level: 'silent' }),
+    browser: randomBrowser,
+    printQRInTerminal: false,
+    // මේ ටික අනිවාර්යයෙන්ම දාන්න
+    canIgnoreSessions: true,
+    markOnlineOnConnect: false,
+    syncFullHistory: false
+});
 
         // Creds update කිරීම (Session එක ස්ථාවරව තබා ගැනීමට)
         sock.ev.on('creds.update', saveCreds);
