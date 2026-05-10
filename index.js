@@ -12,24 +12,34 @@ app.get('/api/search', async (req, res) => {
     try {
         const query = req.query.q;
         const url = `https://cinesubz.co/?s=${encodeURIComponent(query)}`;
-        const { data } = await axios.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+        const { data } = await axios.get(url, { 
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36' } 
+        });
         const $ = cheerio.load(data);
         let results = [];
 
+        // ක්‍රමය 1: Article tags (Cinesubz වල ගොඩක් වෙලාවට මේක වැඩ)
         $('article').each((i, el) => {
-            results.push({
-                title: $(el).find('h2 a').text().trim(),
-                link: $(el).find('h2 a').attr('href'),
-                image: $(el).find('img').attr('src')
-            });
+            const title = $(el).find('h2 a').text().trim() || $(el).find('.entry-title a').text().trim();
+            const link = $(el).find('h2 a').attr('href') || $(el).find('.entry-title a').attr('href');
+            const image = $(el).find('img').attr('src');
+            if (link && title) results.push({ title, link, image });
         });
 
-        res.json({ status: true, results });
+        // ක්‍රමය 2: ප්‍රතිඵල නැත්නම් වෙනත් class එකක් බලමු
+        if (results.length === 0) {
+            $('.result-item').each((i, el) => {
+                const title = $(el).find('.title a').text().trim();
+                const link = $(el).find('.title a').attr('href');
+                if (link && title) results.push({ title, link });
+            });
+        }
+
+        res.json({ status: true, count: results.length, results });
     } catch (e) {
         res.json({ status: false, error: e.message });
     }
 });
-
 // Download Link Route: /api/getlink?url=https://cinesubz.co/movie/xyz
 app.get('/api/getlink', async (req, res) => {
     try {
