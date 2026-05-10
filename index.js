@@ -19,48 +19,45 @@ app.get('/', (req, res) => {
 app.get('/api/search', async (req, res) => {
     try {
         const query = req.query.q;
-        if (!query) return res.json({ status: false, message: "Please provide a search query (?q=movie_name)" });
-
-        // නවතම URL එක: cinesubz.lk
-        const url = `https://cinesubz.lk/?s=${encodeURIComponent(query)}`;
+        // සයිට් එකේ AJAX සර්ච් එකට කෙලින්ම කතා කරමු
+        const url = `https://cinesubz.lk/wp-admin/admin-ajax.php`;
         
-        const response = await axios.get(url, {
+        const params = new URLSearchParams();
+        params.append('action', 'z_ajax_search'); // Zetaflix theme එකේ සර්ච් ඇක්ෂන් එක
+        params.append('keyword', query);
+
+        const response = await axios.post(url, params, {
             headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.5',
-                'Referer': 'https://cinesubz.lk/',
-                'Connection': 'keep-alive',
-                'Upgrade-Insecure-Requests': '1'
+                'X-Requested-With': 'XMLHttpRequest',
+                'Referer': 'https://cinesubz.lk/'
             }
         });
 
+        // AJAX එකෙන් එන්නේ HTML කෑල්ලක්. ඒක පීරමු.
         const $ = cheerio.load(response.data);
         let results = [];
 
-        // ක්‍රමය 1: සයිට් එකේ ලින්ක් පීරලා දත්ත ගැනීම (Universal Method)
-        $('a').each((i, el) => {
-            const link = $(el).attr('href');
-            const title = $(el).text().trim();
+        $('li').each((i, el) => {
+            const title = $(el).find('.result-title').text().trim() || $(el).text().trim();
+            const link = $(el).find('a').attr('href');
+            const img = $(el).find('img').attr('src');
 
-            if (link && link.includes('/movies/') && title.length > 5) {
-                if (!results.find(r => r.link === link)) {
-                    results.push({
-                        title: title,
-                        link: link
-                    });
-                }
+            if (link && link.includes('/movies/')) {
+                results.push({ title, link, img });
             }
         });
 
-        // ක්‍රමය 2: කිසිවක් හමු නොවූයේ නම් Zetaflix Classes බලමු
+        // ඒක වැඩ නැත්නම් පරණ ක්‍රමයත් නිකමට රන් කරමු
         if (results.length === 0) {
-            $('.result-item').each((i, el) => {
-                const title = $(el).find('.title a').text().trim();
-                const link = $(el).find('.title a').attr('href');
-                const image = $(el).find('img').attr('src');
-                if (link && title) results.push({ title, link, image });
-            });
+             const oldRes = await axios.get(`https://cinesubz.lk/?s=${encodeURIComponent(query)}`, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+             const $old = cheerio.load(oldRes.data);
+             $old('a').each((i, el) => {
+                 const l = $old(el).attr('href');
+                 const t = $old(el).text().trim();
+                 if (l && l.includes('/movies/') && t.length > 10) results.push({ title: t, link: l });
+             });
         }
 
         res.json({ 
@@ -71,7 +68,7 @@ app.get('/api/search', async (req, res) => {
         });
 
     } catch (e) {
-        res.status(500).json({ status: false, error: e.message });
+        res.json({ status: false, error: e.message });
     }
 });
 
